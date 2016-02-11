@@ -18,23 +18,24 @@ var (
 )
 
 const (
-	portFlag            = "port"
-	useGzipFlag         = "gzip"
-	allRankingsEndpoint = "/allrankings"
-	rankingsEndpoint    = "/rankings"
+	portFlag              = "port"
+	useGzipFlag           = "gzip"
+	allRankingsEndpoint   = "/allrankings"
+	rankingsEndpoint      = "/rankings"
+	rankedServersEndpoint = "/rankedservers"
 )
 
-// qlStatServer represents an individual server returned by the qlstats
-// /api/server/skillrating endpoint.
-type qlStatServer struct {
-	Server string
-	Gt     string
-	Min    int
-	Avg    int
-	Max    int
-	Pc     int
-	Sc     int
-	Bc     int
+// qlStatServers is a slice of structs representing the JSON array of
+// servers returned by the qlstats /api/server/skillrating endpoint.
+type qlStatServers []struct {
+	Server string `json:"server"`
+	Gt     string `json:"gt"`
+	Min    int    `json:"min"`
+	Avg    int    `json:"avg"`
+	Max    int    `json:"max"`
+	Pc     int    `json:"pc"`
+	Sc     int    `json:"sc"`
+	Bc     int    `json:"bc"`
 }
 
 // qlStatPlayers represents the ranking data returned by the qlstats /api/server/
@@ -67,13 +68,13 @@ type apiRankingResponse struct {
 // rankedPlayer represents an individual ranked player's data returned by the
 // qlstats /api/server/host/players endpoint.
 type rankedPlayer struct {
-	SteamID string
-	Name    string
-	Team    int
-	Rating  int
-	Rd      int
-	Time    int64
-	Server  string // This is added by us for indexing purposes.
+	SteamID string `json:"steamID"`
+	Name    string `json:"name"`
+	Team    int    `json:"team"`
+	Rating  int    `json:"rating"`
+	Rd      int    `json:"round"`
+	Time    int64  `json:"time"`
+	Server  string `json:"server"` // This is added by us for indexing purposes.
 }
 
 func setupLogging() error {
@@ -126,14 +127,14 @@ func getPopulatedRankedServers() ([]string, error) {
 	return servers, nil
 }
 
-func getQLStatsServers() ([]qlStatServer, error) {
+func getQLStatsServers() (qlStatServers, error) {
 	res, err := http.Get("http://api.qlstats.net/api/server/skillrating")
 	if err != nil {
 		return nil, err
 	}
 	defer res.Body.Close()
 
-	var srvs []qlStatServer
+	var srvs qlStatServers
 	dec := json.NewDecoder(res.Body)
 	if err := dec.Decode(&srvs); err != nil {
 		return nil, err

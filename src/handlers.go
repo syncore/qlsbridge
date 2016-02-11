@@ -9,40 +9,54 @@ import (
 	"time"
 )
 
+func defineHandlerFunc(method, path string, handler func(w http.ResponseWriter,
+	r *http.Request)) http.HandlerFunc {
+	hf := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+		if r.Method != method {
+			writeResponseError(http.StatusMethodNotAllowed, w, r)
+		}
+		if r.URL.Path != path {
+			writeResponseError(http.StatusNotFound, w, r)
+			return
+		}
+		handler(w, r)
+	})
+	return hf
+}
+
 func registerHandlers() {
-	allRankings := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-		if r.Method != "GET" {
-			writeResponseError(http.StatusMethodNotAllowed, w, r)
-		}
-		if r.URL.Path != allRankingsEndpoint {
-			writeResponseError(http.StatusNotFound, w, r)
-			return
-		}
-		allRankingsHandler(w, r)
-	})
-	rankings := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-		if r.Method != "GET" {
-			writeResponseError(http.StatusMethodNotAllowed, w, r)
-		}
-		if r.URL.Path != rankingsEndpoint {
-			writeResponseError(http.StatusNotFound, w, r)
-			return
-		}
-		rankingsHandler(w, r)
-	})
+	allRankings := defineHandlerFunc("GET", allRankingsEndpoint,
+		http.HandlerFunc(allRankingsHandler))
+	rankings := defineHandlerFunc("GET", rankingsEndpoint,
+		http.HandlerFunc(rankingsHandler))
+	rankedServers := defineHandlerFunc("GET", rankedServersEndpoint,
+		http.HandlerFunc(rankedServersHandler))
 	if useGzip {
 		http.Handle(allRankingsEndpoint, timeoutHandler(GzipHandler(allRankings)))
 		http.Handle(rankingsEndpoint, timeoutHandler(GzipHandler(rankings)))
+		http.Handle(rankedServersEndpoint, timeoutHandler(GzipHandler(rankedServers)))
 	} else {
 		http.Handle(allRankingsEndpoint, timeoutHandler(allRankings))
 		http.Handle(rankingsEndpoint, timeoutHandler(rankings))
+		http.Handle(rankedServersEndpoint, timeoutHandler(rankedServers))
+	}
+}
+
+func rankedServersHandler(w http.ResponseWriter, r *http.Request) {
+	servers, err := getQLStatsServers()
+	if err != nil {
+		writeResponseError(http.StatusInternalServerError, w, r)
+		return
+	}
+	if err := json.NewEncoder(w).Encode(servers); err != nil {
+		writeResponseError(http.StatusInternalServerError, w, r)
+		return
 	}
 }
 
 func timeoutHandler(h http.Handler) http.Handler {
-	return http.TimeoutHandler(h, time.Duration(2)*time.Second,
+	return http.TimeoutHandler(h, time.Duration(7)*time.Second,
 		`{"error": {"code": 503,"message": "Request timeout."}}`)
 }
 
