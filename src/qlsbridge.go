@@ -79,7 +79,7 @@ type rankedPlayer struct {
 	Rd      int    `json:"round"`
 	Time    int64  `json:"time"`
 	Server  string `json:"server"` // This is added by us for indexing purposes.
-	IP      string `json:"server"` // This is added by us for indexing purposes.
+	IP      string `json:"ip"`     // This is added by us for indexing purposes.
 }
 
 func setupLogging() error {
@@ -145,8 +145,7 @@ func getQLStatsServers() (qlStatServers, error) {
 	}
 	var srvs qlStatServers
 	for _, s := range q {
-		ip := strings.Split(s.Server, ":")
-		s.IP = ip[0]
+		s.IP = strings.Split(s.Server, ":")[0]
 		srvs = append(srvs, s)
 	}
 	return srvs, nil
@@ -178,6 +177,7 @@ func getQLStatsPlayerRankings(servers []string) (apiRankingResponse, error) {
 			for _, p := range qp.Players {
 				mut.Lock()
 				p.Server = addr
+				p.IP = strings.Split(addr, ":")[0]
 				rankingResponse.RankedPlayers = append(rankingResponse.RankedPlayers, p)
 				mut.Unlock()
 			}
