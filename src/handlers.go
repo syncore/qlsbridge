@@ -9,37 +9,41 @@ import (
 	"time"
 )
 
-func defineHandlerFunc(method, path string, handler func(w http.ResponseWriter,
-	r *http.Request)) http.HandlerFunc {
-	hf := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-		if r.Method != method {
-			writeResponseError(http.StatusMethodNotAllowed, w, r)
-		}
-		if r.URL.Path != path {
-			writeResponseError(http.StatusNotFound, w, r)
+func wrapHandlerFunc(method, path string, handler http.Handler) http.Handler {
+	wrapped := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		rw.Header().Set("Content-Type", "application/json; charset=UTF-8")
+		if req.Method != method {
+			writeResponseError(http.StatusMethodNotAllowed, rw, req)
 			return
 		}
-		handler(w, r)
+		if req.URL.Path != path {
+			writeResponseError(http.StatusNotFound, rw, req)
+			return
+		}
+		handler = timeoutHandler(handler)
+		handler.ServeHTTP(rw, req)
 	})
-	return hf
+	return http.HandlerFunc(wrapped)
 }
 
 func registerHandlers() {
-	allRankings := defineHandlerFunc("GET", allRankingsEndpoint,
+	// GET: http://server/allrankings
+	allRankings := wrapHandlerFunc("GET", allRankingsEndpoint,
 		http.HandlerFunc(allRankingsHandler))
-	rankings := defineHandlerFunc("GET", rankingsEndpoint,
+	// GET: http://server/rankings?servers=ip1,ip2,ipn
+	rankings := wrapHandlerFunc("GET", rankingsEndpoint,
 		http.HandlerFunc(rankingsHandler))
-	rankedServers := defineHandlerFunc("GET", rankedServersEndpoint,
+	// GET: http://server/rankedservers
+	rankedServers := wrapHandlerFunc("GET", rankedServersEndpoint,
 		http.HandlerFunc(rankedServersHandler))
 	if useGzip {
-		http.Handle(allRankingsEndpoint, timeoutHandler(GzipHandler(allRankings)))
-		http.Handle(rankingsEndpoint, timeoutHandler(GzipHandler(rankings)))
-		http.Handle(rankedServersEndpoint, timeoutHandler(GzipHandler(rankedServers)))
+		http.Handle(allRankingsEndpoint, GzipHandler(allRankings))
+		http.Handle(rankingsEndpoint, GzipHandler(rankings))
+		http.Handle(rankedServersEndpoint, GzipHandler(rankedServers))
 	} else {
-		http.Handle(allRankingsEndpoint, timeoutHandler(allRankings))
-		http.Handle(rankingsEndpoint, timeoutHandler(rankings))
-		http.Handle(rankedServersEndpoint, timeoutHandler(rankedServers))
+		http.Handle(allRankingsEndpoint, allRankings)
+		http.Handle(rankingsEndpoint, rankings)
+		http.Handle(rankedServersEndpoint, rankedServers)
 	}
 }
 
@@ -56,7 +60,7 @@ func rankedServersHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func timeoutHandler(h http.Handler) http.Handler {
-	return http.TimeoutHandler(h, time.Duration(7)*time.Second,
+	return http.TimeoutHandler(h, timeoutSecs*time.Second,
 		`{"error": {"code": 503,"message": "Request timeout."}}`)
 }
 

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 
 	log "github.com/Sirupsen/logrus"
@@ -23,12 +24,14 @@ const (
 	allRankingsEndpoint   = "/allrankings"
 	rankingsEndpoint      = "/rankings"
 	rankedServersEndpoint = "/rankedservers"
+	timeoutSecs           = 7
 )
 
 // qlStatServers is a slice of structs representing the JSON array of
 // servers returned by the qlstats /api/server/skillrating endpoint.
 type qlStatServers []struct {
 	Server string `json:"server"`
+	IP     string `json:"ip"`
 	Gt     string `json:"gt"`
 	Min    int    `json:"min"`
 	Avg    int    `json:"avg"`
@@ -45,6 +48,7 @@ type qlStatPlayers struct {
 	Players    []rankedPlayer
 	ServerInfo struct {
 		Server   string
+		IP       string
 		Gt       string
 		Min      int
 		Avg      int
@@ -75,6 +79,7 @@ type rankedPlayer struct {
 	Rd      int    `json:"round"`
 	Time    int64  `json:"time"`
 	Server  string `json:"server"` // This is added by us for indexing purposes.
+	IP      string `json:"server"` // This is added by us for indexing purposes.
 }
 
 func setupLogging() error {
@@ -133,11 +138,16 @@ func getQLStatsServers() (qlStatServers, error) {
 		return nil, err
 	}
 	defer res.Body.Close()
-
-	var srvs qlStatServers
+	var q qlStatServers
 	dec := json.NewDecoder(res.Body)
-	if err := dec.Decode(&srvs); err != nil {
+	if err := dec.Decode(&q); err != nil {
 		return nil, err
+	}
+	var srvs qlStatServers
+	for _, s := range q {
+		ip := strings.Split(s.Server, ":")
+		s.IP = ip[0]
+		srvs = append(srvs, s)
 	}
 	return srvs, nil
 }
