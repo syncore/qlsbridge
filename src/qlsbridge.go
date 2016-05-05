@@ -13,18 +13,19 @@ import (
 )
 
 var (
-	port    int
-	useGzip bool
-	logger  *log.Logger
+	port        int
+	useGzip     bool
+	timeoutSecs int
+	logger      *log.Logger
 )
 
 const (
 	portFlag              = "port"
 	useGzipFlag           = "gzip"
+	timeoutFlag           = "timeout"
 	allRankingsEndpoint   = "/allrankings"
 	rankingsEndpoint      = "/rankings"
 	rankedServersEndpoint = "/rankedservers"
-	timeoutSecs           = 7
 )
 
 // qlStatServers is a slice of structs representing the JSON array of
@@ -58,7 +59,7 @@ type qlStatPlayers struct {
 		Bc       int
 		Rating   string
 		Map      string
-		MapStart string
+		MapStart interface{} // this is broken in the QLStats API (can be string or int)
 	}
 }
 
@@ -99,6 +100,7 @@ func setupLogging() error {
 func init() {
 	flag.IntVar(&port, portFlag, 40081, "The HTTP server port")
 	flag.BoolVar(&useGzip, useGzipFlag, false, "Use gzip compression on response")
+	flag.IntVar(&timeoutSecs, timeoutFlag, 10, "The timeout, in secs, for HTTP requests")
 	if err := setupLogging(); err != nil {
 		panic("Unable to setup logging")
 	}

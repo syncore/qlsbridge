@@ -60,7 +60,7 @@ func rankedServersHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func timeoutHandler(h http.Handler) http.Handler {
-	return http.TimeoutHandler(h, timeoutSecs*time.Second,
+	return http.TimeoutHandler(h, time.Duration(timeoutSecs)*time.Second,
 		`{"error": {"code": 503,"message": "Request timeout."}}`)
 }
 
