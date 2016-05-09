@@ -20,22 +20,29 @@ func wrapHandlerFunc(method, path string, handler http.Handler) http.Handler {
 			writeResponseError(http.StatusNotFound, rw, req)
 			return
 		}
-		handler = timeoutHandler(handler)
 		handler.ServeHTTP(rw, req)
 	})
 	return http.HandlerFunc(wrapped)
 }
 
 func registerHandlers() {
+	timeoutMsg := `{"error": {"code": 503,"message": "Request timeout."}}`
+
 	// GET: http://server/allrankings
-	allRankings := wrapHandlerFunc("GET", allRankingsEndpoint,
-		http.HandlerFunc(allRankingsHandler))
+	allRankings := http.TimeoutHandler(wrapHandlerFunc("GET", allRankingsEndpoint,
+		http.HandlerFunc(allRankingsHandler)), time.Duration(timeoutSecs)*time.Second,
+		timeoutMsg)
+
 	// GET: http://server/rankings?servers=ip1,ip2,ipn
-	rankings := wrapHandlerFunc("GET", rankingsEndpoint,
-		http.HandlerFunc(rankingsHandler))
+	rankings := http.TimeoutHandler(wrapHandlerFunc("GET", rankingsEndpoint,
+		http.HandlerFunc(rankingsHandler)), time.Duration(timeoutSecs)*time.Second,
+		timeoutMsg)
+
 	// GET: http://server/rankedservers
-	rankedServers := wrapHandlerFunc("GET", rankedServersEndpoint,
-		http.HandlerFunc(rankedServersHandler))
+	rankedServers := http.TimeoutHandler(wrapHandlerFunc("GET", rankedServersEndpoint,
+		http.HandlerFunc(rankedServersHandler)), time.Duration(timeoutSecs)*time.Second,
+		timeoutMsg)
+
 	if useGzip {
 		http.Handle(allRankingsEndpoint, GzipHandler(allRankings))
 		http.Handle(rankingsEndpoint, GzipHandler(rankings))
@@ -57,11 +64,6 @@ func rankedServersHandler(w http.ResponseWriter, r *http.Request) {
 		writeResponseError(http.StatusInternalServerError, w, r)
 		return
 	}
-}
-
-func timeoutHandler(h http.Handler) http.Handler {
-	return http.TimeoutHandler(h, time.Duration(timeoutSecs)*time.Second,
-		`{"error": {"code": 503,"message": "Request timeout."}}`)
 }
 
 func rankingsHandler(w http.ResponseWriter, r *http.Request) {
