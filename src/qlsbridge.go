@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"time"
 
 	log "github.com/Sirupsen/logrus"
 )
@@ -113,7 +114,13 @@ func main() {
 
 func start(httpPort int) {
 	registerHandlers()
-	err := http.ListenAndServe(fmt.Sprintf(":%d", httpPort), nil)
+	srv := http.Server{
+		Addr:           fmt.Sprintf(":%d", httpPort),
+		ReadTimeout:    30 * time.Second,
+		WriteTimeout:   30 * time.Second,
+		MaxHeaderBytes: 1 << 20}
+
+	err := srv.ListenAndServe()
 	if err != nil {
 		panic(fmt.Sprintf("Unable to start HTTP server: %s", err))
 	}
